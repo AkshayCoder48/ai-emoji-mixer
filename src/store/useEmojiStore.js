@@ -1,52 +1,70 @@
-import { create } from 'zustand';
+import create from 'zustand';
+
+// Mock Puter.js API function - replace with actual implementation
+const generateEmojiFromPuter = async (prompt) => {
+  // Simulate API latency
+  await new Promise(resolve => setTimeout(resolve, 2000));
+  
+  // Simulate occasional errors (10% chance)
+  if (Math.random() < 0.1) {
+    throw new Error('API rate limit exceeded. Please try again in a moment.');
+  }
+  
+  if (!prompt || prompt.trim().length < 2) {
+    throw new Error('Please enter a more descriptive prompt (at least 2 characters)');
+  }
+  
+  // Return mock image URL (replace with actual Puter.js response)
+  return `https://picsum.photos/seed/${encodeURIComponent(prompt)}/200/200`;
+};
 
 const useEmojiStore = create((set, get) => ({
   prompt: '',
-  setPrompt: (prompt) => set({ prompt }),
-  history: [],
+  generatedUrl: null,
   isLoading: false,
+  error: null,
+  history: [],
+  
+  setPrompt: (prompt) => set({ prompt }),
   
   generateEmoji: async () => {
     const { prompt } = get();
-    if (!prompt.trim()) return;
     
-    set({ isLoading: true });
+    // Validation
+    if (!prompt.trim()) {
+      set({ error: 'Please enter a prompt to generate an emoji' });
+      return;
+    }
+    
+    if (prompt.length > 100) {
+      set({ error: 'Prompt is too long. Please keep it under 100 characters' });
+      return;
+    }
+    
+    set({ 
+      isLoading: true, 
+      error: null, 
+      generatedUrl: null 
+    });
     
     try {
-      // TODO: Integrate Puter.js AI generation here
-      // For now, simulate API response
-      await new Promise(resolve => setTimeout(resolve, 1500));
-      
-      const newItem = {
-        id: Date.now(),
-        prompt: prompt,
-        imageUrl: `https://placehold.co/512x512/1a1a2e/FFF?text=${encodeURIComponent(prompt.substring(0, 20))}`,
-        timestamp: new Date().toISOString(),
-      };
-      
-      set(state => ({
-        history: [newItem, ...state.history],
+      const result = await generateEmojiFromPuter(prompt);
+      set({ 
+        generatedUrl: result,
         isLoading: false,
-        prompt: ''
-      }));
-      
-    } catch (error) {
-      console.error('Generation failed:', error);
-      set({ isLoading: false });
+        history: [result, ...get().history].slice(0, 10) // Keep last 10
+      });
+    } catch (err) {
+      set({ 
+        error: err.message || 'Failed to generate emoji. Please try again.',
+        isLoading: false,
+        generatedUrl: null
+      });
     }
   },
-
-  clearHistory: () => set({ history: [] }),
   
-  deleteHistoryItem: (id) => set(state => ({
-    history: state.history.filter(item => item.id !== id)
-  }))
+  clearError: () => set({ error: null }),
+  clearHistory: () => set({ history: [] })
 }));
-
-// Selector hooks for optimized re-renders
-export const usePrompt = () => useEmojiStore(state => state.prompt);
-export const useSetPrompt = () => useEmojiStore(state => state.setPrompt);
-export const useHistory = () => useEmojiStore(state => state.history);
-export const useIsLoading = () => useEmojiStore(state => state.isLoading);
 
 export default useEmojiStore;
